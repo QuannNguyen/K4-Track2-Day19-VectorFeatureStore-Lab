@@ -59,3 +59,21 @@ def test_searcher_collection_uses_backend_dim():
     """Regression: the collection was created from a hard-coded EMBED_DIM."""
     from app import search
     assert search.EMBED_DIM == Embedder().dim
+
+
+def test_searcher_reuses_cached_query_embedding():
+    from app.search import Searcher
+
+    class CountingEmbedder:
+        calls = 0
+
+        def embed(self, texts):
+            self.calls += 1
+            return iter([[0.1, 0.2]])
+
+    searcher = Searcher()
+    searcher.embedder = CountingEmbedder()
+
+    assert searcher._embed_query("cloud search") == (0.1, 0.2)
+    assert searcher._embed_query("cloud search") == (0.1, 0.2)
+    assert searcher.embedder.calls == 1

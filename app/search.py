@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import json
 import os
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Literal
 
 from qdrant_client import QdrantClient
@@ -52,6 +54,8 @@ class Searcher:
         self.bm25: BM25Okapi | None = None
         self.client: QdrantClient | None = None
         self.embedder: Embedder | None = None
+        self._query_vectors: OrderedDict[str, tuple[float, ...]] = OrderedDict()
+        self._query_vectors_lock = Lock()
 
     @property
     def size(self) -> int:
@@ -162,7 +166,7 @@ class Searcher:
 
     def _search_semantic(self, query: str, top_k: int) -> list[SearchHit]:
         assert self.client is not None and self.embedder is not None
-        q_vec = next(self.embedder.embed([query])).tolist()
+        q_vec = list(self._embed_query(query))
         result = self.client.query_points(
             collection_name=COLLECTION,
             query=q_vec,
@@ -177,6 +181,25 @@ class Searcher:
             )
             for p in result.points
         ]
+
+    def _embed_query(self, query: str) -> tuple[float, ...]:
+        assert self.embedder is not None
+        with self._query_vectors_lock:
+            cached = self._query_vectors.get(query)
+            if cached is not None:
+                self._query_vectors.move_to_end(query)
+                return cached
+
+        vector = tuple(float(value) for value in next(self.embedder.embed([query])))
+        with self._query_vectors_lock:
+            cached = self._query_vectors.get(query)
+            if cached is not None:
+                self._query_vectors.move_to_end(query)
+                return cached
+            self._query_vectors[query] = vector
+            if len(self._query_vectors) > 512:
+                self._query_vectors.popitem(last=False)
+        return vector
 
     def _search_hybrid(self, query: str, top_k: int, rrf_k: int) -> list[SearchHit]:
         # Pull a deeper top-K from each retriever so RRF has signal beyond top-10.

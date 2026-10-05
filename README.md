@@ -54,7 +54,7 @@ make seed            Both: regenerate data/ files
 make api             Lite: FastAPI on :8000
 make lab             Lite: Jupyter Lab on :8888
 make benchmark       Both: Precision@10 + P99 latency table
-make test            Both: pytest (34 tests, ~2 s)
+make test            Both: run the full pytest suite
 make gen-advanced    Both: regenerate NB6 compound queries + NB8 spend parquet
 make notebooks       Both: execute ALL notebooks headless (what the grader runs)
 make clean-lite      Lite: wipe venv + data + Feast registry
@@ -124,6 +124,9 @@ make container-down ARGS=--wipe   # dừng + xoá volume
 | `02_hybrid_search_rrf` | BM25 + vector + RRF (k=60) + đánh giá Precision@10 trên 50 golden queries | Bullet 2 — hybrid > keyword & semantic | Hybrid wins on `mixed` slice; thắng trung bình tổng thể |
 | `03_search_api_benchmark` | FastAPI `/search?q=...&mode=...` + đo P50/P95/P99 latency | Bullet 1 + 4 — REST endpoint < 50ms P99 | Hybrid P99 server-side < 50 ms |
 | `04_feast_feature_store` | 3 feature views + `feast apply` + `materialize` + online lookup + PIT join | Bullet 3 — Feast 3 views materialize+online | `materialize` thành công; online lookup P99 < 10ms |
+
+`Searcher` giữ tối đa 512 query embedding gần nhất trong cache theo từng process,
+giúp các truy vấn lặp lại tránh chạy lại model embedding mà không đổi thứ hạng.
 
 ### Khối nâng cao (NB5–NB8) — theo bản deck mở rộng 2026
 
